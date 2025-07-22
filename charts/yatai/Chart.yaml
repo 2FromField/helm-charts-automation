@@ -1,0 +1,22 @@
+apiVersion: v2
+description: Yatai lets you deploy, operate and scale Machine Learning services on Kubernetes.
+home: https://github.com/bentoml/yatai
+sources:
+- https://github.com/InseeFrLab/helm-charts-automation/tree/master/charts/argo-workflows
+- https://github.com/bentoml/yatai
+- https://github.com/bentoml/yatai-deployment
+- https://github.com/bentoml/yatai-image-builder
+
+name: yatai
+type: application
+version: 2.0.2
+
+dependencies:
+- name: common
+  repository: https://charts.bitnami.com/bitnami
+  tags:
+  - bitnami-common
+  version: 2.x
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 13.1.5

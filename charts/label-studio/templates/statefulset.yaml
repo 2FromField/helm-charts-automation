@@ -1,0 +1,97 @@
+{{- $fullName := include "library-chart.fullname" . -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "library-chart.fullname" . }}
+  labels:
+    {{- include "library-chart.labels" . | nindent 4 }}
+spec:
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      {{- include "library-chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "library-chart.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.service.image.repository }}:{{ .Values.service.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.service.image.pullPolicy }}
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: /label-studio/data
+          {{- end }}
+          envFrom:
+            {{- if .Values.s3.enabled }}
+            - secretRef:
+                name: {{ include "library-chart.secretNameS3" . }}
+            {{- end }}
+          env:
+            - name: LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK
+              value: "true"
+            - name: LABEL_STUDIO_USERNAME
+              value: {{ .Values.security.username }}
+            - name: LABEL_STUDIO_PASSWORD
+              value: {{ .Values.security.password }}
+            - name: AWS_ENDPOINT_URL
+              value: "https://{{ .Values.s3.endpoint }}"
+            - name: CSRF_TRUSTED_ORIGINS
+              value: "http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.hostname }}"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["{{ .Values.persistence.accessMode }}"]
+      {{- if .Values.persistence.storageClass }}
+      {{- if (eq "-" .Values.persistence.storageClass) }}
+      storageClassName: ""
+      {{- else }}
+      storageClassName: "{{ .Values.persistence.storageClass }}"
+      {{- end }}
+      {{- end }}
+      resources:
+        requests:
+          storage: "{{ .Values.persistence.size }}"
+  {{- end }}
